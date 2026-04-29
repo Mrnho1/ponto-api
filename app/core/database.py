@@ -10,3 +10,10 @@ engine = create_engine(
 SessionLocal = sessionmaker(bind=engine)
 #Base que todos os models herdam
 Base = declarative_base()
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

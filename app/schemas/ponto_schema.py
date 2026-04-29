@@ -1,9 +1,18 @@
 from pydantic import BaseModel
 from datetime import datetime
-#Modo de resposta da API
+from app.models.tipo_ponto import TipoPonto
+
 class PontoResponse(BaseModel):
     id: int
     data_hora: datetime
-    #Igual ao mapStruct
+    tipo: TipoPonto
+
     class Config:
-        orm_mode = True #Permite converter automaticamente do model
+        from_attributes = True
+
+
+class PontoAjustadoResponse(BaseModel):
+    id: int
+    data_original: datetime
+    data_ajustada: datetime
+    tipo: TipoPonto
