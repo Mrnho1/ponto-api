@@ -1,12 +1,14 @@
 from collections import defaultdict
 from datetime import timedelta
-
 from sqlalchemy.orm import Session
-from app.repositories import ajuste_repository, ponto_repository
+from app.repositories import ponto_repository, ajuste_repository, user_repository
 from app.models.tipo_ponto import TipoPonto
 
-def registrar_ponto(db: Session):
-    pontos_hoje = ponto_repository.listar_pontos_do_dia(db)
+
+def registrar_ponto(db: Session, username: str):
+    user = user_repository.buscar_por_username(db, username)
+
+    pontos_hoje = ponto_repository.listar_pontos_do_dia_por_usuario(db, user.id)
 
     quantidade = len(pontos_hoje)
 
@@ -21,79 +23,87 @@ def registrar_ponto(db: Session):
     else:
         raise Exception("Limite de pontos atingido no dia")
 
-    return ponto_repository.criar_ponto(db, tipo)
+    return ponto_repository.criar_ponto(db, tipo, user.id)
 
-def buscar_pontos(db: Session):
-    pontos = ponto_repository.listar_pontos_do_dia(db)
+
+# 🔎 LISTAR PONTOS
+def buscar_pontos(db: Session, username: str, role: str):
+    if role == "ADMIN":
+        pontos = ponto_repository.listar_todos_pontos(db)
+    else:
+        user = user_repository.buscar_por_username(db, username)
+        pontos = ponto_repository.listar_pontos_do_dia_por_usuario(db, user.id)
+
     ajustes = ajuste_repository.listar_ajustes(db)
+    mapa = {a.ponto_id: a.nova_data for a in ajustes}
 
-    mapa_ajustes = {a.ponto_id: a.nova_data for a in ajustes}
-
-    resultado = []
-
-    for p in pontos:
-        resultado.append({
+    return [
+        {
             "id": p.id,
-            "data_hora": mapa_ajustes.get(p.id, p.data_hora),
+            "data_hora": mapa.get(p.id, p.data_hora),
             "tipo": p.tipo
-        })
+        }
+        for p in pontos
+    ]
 
-    return resultado
 
+# 🔎 AJUSTADOS
+def buscar_pontos_ajustados(db: Session, username: str, role: str):
+    if role == "ADMIN":
+        pontos = ponto_repository.listar_todos_pontos(db)
+    else:
+        user = user_repository.buscar_por_username(db, username)
+        pontos = ponto_repository.listar_pontos_do_dia_por_usuario(db, user.id)
 
-def buscar_pontos_ajustados(db: Session):
-    pontos = ponto_repository.listar_pontos_do_dia(db)
     ajustes = ajuste_repository.listar_ajustes(db)
+    mapa = {a.ponto_id: a.nova_data for a in ajustes}
 
-    mapa_ajustes = {a.ponto_id: a.nova_data for a in ajustes}
-
-    resultado = []
-
-    for p in pontos:
-        resultado.append({
+    return [
+        {
             "id": p.id,
             "data_original": p.data_hora,
-            "data_ajustada": mapa_ajustes.get(p.id, p.data_hora),
+            "data_ajustada": mapa.get(p.id, p.data_hora),
             "tipo": p.tipo
-        })
+        }
+        for p in pontos
+    ]
 
-    return resultado
 
-def buscar_todos_pontos(db: Session):
-    return ponto_repository.listar_todos_pontos(db)
+# 🔎 HISTÓRICO
+def buscar_todos_pontos(db: Session, role: str, username: str):
+    if role == "ADMIN":
+        return ponto_repository.listar_todos_pontos(db)
 
-def calcular_banco_horas(db: Session):
-    pontos = ponto_repository.listar_todos_pontos(db)
+    user = user_repository.buscar_por_username(db, username)
+    return ponto_repository.listar_por_usuario(db, user.id)
+
+
+# 🧮 BANCO DE HORAS
+def calcular_banco_horas(db: Session, username: str, role: str):
+    if role == "ADMIN":
+        pontos = ponto_repository.listar_todos_pontos(db)
+    else:
+        user = user_repository.buscar_por_username(db, username)
+        pontos = ponto_repository.listar_por_usuario(db, user.id)
+
     ajustes = ajuste_repository.listar_ajustes(db)
-
-    mapa_ajustes = {a.ponto_id: a.nova_data for a in ajustes}
+    mapa = {a.ponto_id: a.nova_data for a in ajustes}
 
     dias = defaultdict(list)
 
-    # Agrupar por dia (com ajuste aplicado)
     for p in pontos:
-        data = mapa_ajustes.get(p.id, p.data_hora)
-        dia = data.date()
-        dias[dia].append((p, data))
+        data = mapa.get(p.id, p.data_hora)
+        dias[data.date()].append(data)
 
     total = timedelta()
 
-    for dia, registros in dias.items():
+    for registros in dias.values():
         if len(registros) == 4:
-            # Ordena pelos horários (IMPORTANTE)
-            registros.sort(key=lambda x: x[1])
+            registros.sort()
 
-            entrada = registros[0][1]
-            saida_almoco = registros[1][1]
-            volta_almoco = registros[2][1]
-            saida = registros[3][1]
-
-            horas = (saida_almoco - entrada) + (saida - volta_almoco)
-
+            horas = (registros[1] - registros[0]) + (registros[3] - registros[2])
             jornada = timedelta(hours=8)
 
             total += (horas - jornada)
 
-    return {
-        "banco_horas": str(total)
-    }
+    return {"banco_horas": str(total)}
