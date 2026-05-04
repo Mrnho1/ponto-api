@@ -32,3 +32,6 @@ def listar_por_usuario(db: Session, user_id: int):
     return db.query(Ponto).filter(
         Ponto.user_id == user_id
     ).order_by(Ponto.data_hora).all()
+    
+def buscar_por_id(db: Session, ponto_id: int):
+    return db.query(Ponto).filter(Ponto.id == ponto_id).first()

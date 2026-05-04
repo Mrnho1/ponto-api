@@ -20,3 +20,10 @@ def criar_ajuste(
         ajuste.nova_data,
         ajuste.motivo
     )
+
+@router.get("/")
+def listar_ajustes(
+    db: Session = Depends(get_db),
+    user = Depends(admin_only)
+):
+    return ajuste_service.listar_ajustes(db)

@@ -38,13 +38,13 @@ def buscar_pontos(db: Session, username: str, role: str):
     mapa = {a.ponto_id: a.nova_data for a in ajustes}
 
     return [
-        {
-            "id": p.id,
-            "data_hora": mapa.get(p.id, p.data_hora),
-            "tipo": p.tipo
-        }
-        for p in pontos
-    ]
+    {
+        "id": p.id,
+        "data_hora": p.data_hora,
+        "tipo": p.tipo
+    }
+    for p in pontos
+]
 
 
 # 🔎 AJUSTADOS
@@ -56,13 +56,14 @@ def buscar_pontos_ajustados(db: Session, username: str, role: str):
         pontos = ponto_repository.listar_pontos_do_dia_por_usuario(db, user.id)
 
     ajustes = ajuste_repository.listar_ajustes(db)
-    mapa = {a.ponto_id: a.nova_data for a in ajustes}
+
+    mapa = {a.ponto_id: a for a in ajustes}
 
     return [
         {
             "id": p.id,
-            "data_original": p.data_hora,
-            "data_ajustada": mapa.get(p.id, p.data_hora),
+            "data_original": mapa[p.id].criado_em if p.id in mapa else p.data_hora,
+            "data_ajustada": p.data_hora,
             "tipo": p.tipo
         }
         for p in pontos
@@ -87,13 +88,12 @@ def calcular_banco_horas(db: Session, username: str, role: str):
         pontos = ponto_repository.listar_por_usuario(db, user.id)
 
     ajustes = ajuste_repository.listar_ajustes(db)
-    mapa = {a.ponto_id: a.nova_data for a in ajustes}
+    
 
     dias = defaultdict(list)
 
     for p in pontos:
-        data = mapa.get(p.id, p.data_hora)
-        dias[data.date()].append(data)
+        dias[p.data_hora.date()].append(p.data_hora)
 
     total = timedelta()
 

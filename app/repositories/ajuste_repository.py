@@ -5,7 +5,8 @@ def criar_ajuste(db: Session, ponto_id, nova_data, motivo):
     ajuste = AjusteManual(
         ponto_id=ponto_id,
         nova_data=nova_data,
-        motivo=motivo
+        motivo=motivo,
+        user_id=user_id
     )
     db.add(ajuste)
     db.commit()
